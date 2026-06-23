@@ -24,7 +24,28 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.app { min-height: 100vh; }
+.app { min-height: 100vh; display: none; }
+body.signed-in .app { display: block; }
+.topbar-actions { display: flex; gap: 10px; align-items: center; }
+
+/* Auth gate */
+.auth-gate {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: radial-gradient(1000px 500px at 70% -10%, #1d2742 0%, transparent 60%), var(--bg);
+}
+body.signed-in .auth-gate { display: none; }
+.auth-card {
+  width: 100%; max-width: 380px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 20px; padding: 28px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 14px;
+  animation: pop .25s ease;
+}
+.auth-brand { display: flex; align-items: center; gap: 12px; justify-content: center; margin-bottom: 6px; }
+.auth-msg { font-size: 13px; min-height: 18px; color: var(--muted); text-align: center; }
+.auth-msg.error { color: var(--bad); }
+.auth-msg.ok { color: var(--good); }
+.auth-card .btn { width: 100%; }
 
 /* Brand */
 .brand { display: flex; align-items: center; gap: 12px; }

@@ -44,6 +44,7 @@ let DATA = loadData();
    ============================================================ */
 const HABIT_KEYS = HABITS.map(h => h.key);
 let sb = null;
+let currentUser = null;
 try {
   if (window.supabase && typeof SUPABASE_URL === 'string') {
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -60,6 +61,7 @@ function setSync(state, label) {
 // Convert a stored entry to a Supabase row.
 function entryToRow(ds, e) {
   const row = { date: ds, weight: e.weight ?? null, steps: e.steps ?? null, steps2: e.steps2 ?? null };
+  if (currentUser) row.user_id = currentUser.id;
   HABIT_KEYS.forEach(k => { row[k] = !!e[k]; });
   return row;
 }
@@ -70,17 +72,21 @@ function rowToEntry(r) {
   return e;
 }
 
-// Pull all rows from Supabase and merge into DATA.
+// Pull all rows for the logged-in user and merge into DATA.
 async function pullAll() {
-  if (!sb) { setSync('off', 'local only'); return; }
+  if (!sb || !currentUser) { setSync('off', 'local only'); return; }
   setSync('syncing', 'syncing…');
   try {
     const { data, error } = await sb.from('entries').select('*');
     if (error) throw error;
-    (data || []).forEach(r => { DATA[r.date] = rowToEntry(r); });
+    const cloudDates = new Set();
+    (data || []).forEach(r => { DATA[r.date] = rowToEntry(r); cloudDates.add(r.date); });
     saveData(DATA);
-    setSync('ok', 'synced');
     render();
+    // Push any local-only entries up to the cloud (e.g. data logged before signing in).
+    const localOnly = Object.keys(DATA).filter(ds => !cloudDates.has(ds));
+    for (const ds of localOnly) await pushEntry(ds, DATA[ds], true);
+    setSync('ok', 'synced');
   } catch (e) {
     console.warn('Supabase pull failed:', e.message || e);
     setSync('off', 'offline');
@@ -88,17 +94,79 @@ async function pullAll() {
 }
 
 // Push a single entry to Supabase.
-async function pushEntry(ds, entry) {
-  if (!sb) return;
-  setSync('syncing', 'saving…');
+async function pushEntry(ds, entry, quiet) {
+  if (!sb || !currentUser) return;
+  if (!quiet) setSync('syncing', 'saving…');
   try {
-    const { error } = await sb.from('entries').upsert(entryToRow(ds, entry), { onConflict: 'date' });
+    const { error } = await sb.from('entries').upsert(entryToRow(ds, entry), { onConflict: 'user_id,date' });
     if (error) throw error;
-    setSync('ok', 'synced');
+    if (!quiet) setSync('ok', 'synced');
   } catch (e) {
     console.warn('Supabase save failed:', e.message || e);
-    setSync('off', 'saved locally');
+    if (!quiet) setSync('off', 'saved locally');
   }
+}
+
+/* ---- Authentication ---- */
+function authMsg(text, kind) {
+  const el = $('#authMsg');
+  el.textContent = text || '';
+  el.className = 'auth-msg' + (kind ? ' ' + kind : '');
+}
+
+async function initAuth() {
+  if (!sb) {                       // no backend configured -> local-only mode
+    document.body.classList.add('signed-in');
+    setSync('off', 'local only');
+    render();
+    return;
+  }
+  const { data } = await sb.auth.getSession();
+  await handleSession(data.session);
+  sb.auth.onAuthStateChange((_event, session) => handleSession(session));
+}
+
+async function handleSession(session) {
+  currentUser = session?.user || null;
+  if (currentUser) {
+    document.body.classList.add('signed-in');
+    $('#authSub').textContent = 'Sign in to continue';
+    render();
+    await pullAll();
+  } else {
+    document.body.classList.remove('signed-in');
+  }
+}
+
+async function signIn() {
+  const email = $('#authEmail').value.trim();
+  const password = $('#authPass').value;
+  if (!email || !password) { authMsg('Enter your email and password.', 'error'); return; }
+  authMsg('Signing in…');
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) authMsg(error.message, 'error');
+}
+
+async function signUp() {
+  const email = $('#authEmail').value.trim();
+  const password = $('#authPass').value;
+  if (!email || !password) { authMsg('Enter an email and password to sign up.', 'error'); return; }
+  if (password.length < 6) { authMsg('Password must be at least 6 characters.', 'error'); return; }
+  authMsg('Creating account…');
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) { authMsg(error.message, 'error'); return; }
+  if (!data.session) authMsg('Account created. Check your email to confirm, then sign in.', 'ok');
+}
+
+async function signOut() {
+  if (sb) await sb.auth.signOut();
+  currentUser = null;
+  DATA = {};
+  localStorage.removeItem(STORE_KEY);
+  document.body.classList.remove('signed-in');
+  $('#authEmail').value = '';
+  $('#authPass').value = '';
+  authMsg('');
 }
 
 // Combined daily steps (morning + evening) and whether the goal is met.
@@ -511,5 +579,10 @@ document.addEventListener('click', (e) => {
 
 $('#overlay').addEventListener('click', (e) => { if (e.target === $('#overlay')) closeModal(); });
 
-render();      // instant render from localStorage
-pullAll();     // then sync from Supabase
+// Auth controls
+$('#authSignIn').addEventListener('click', signIn);
+$('#authSignUp').addEventListener('click', signUp);
+$('#logoutBtn').addEventListener('click', signOut);
+$('#authPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
+
+initAuth();    // gate the app behind login, then sync from Supabase
