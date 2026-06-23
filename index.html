@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Progress Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="brand">
+            <div class="brand-mark">◑</div>
+            <div class="brand-text">
+              <span class="brand-title">FitTrack</span>
+              <span class="brand-sub">104 → 73 kg</span>
+            </div>
+          </div>
+          <div class="topbar-meta">
+            <span>Started <b id="startDateLabel">—</b></span>
+            <span class="dot-sep">•</span>
+            <span>Goal <b id="goalDate">—</b></span>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="openLog">＋ Log today's data</button>
+      </header>
+
+      <div class="page-title">
+        <h1>Progress as of <span id="todayLabel">today</span></h1>
+        <p class="muted">Every day counts. Keep the streak alive.</p>
+      </div>
+
+      <!-- Hero progress -->
+      <section class="hero">
+        <div class="ring-card">
+          <svg viewBox="0 0 200 200" class="ring">
+            <circle class="ring-bg" cx="100" cy="100" r="84" />
+            <circle class="ring-fg" cx="100" cy="100" r="84" id="ringFg" />
+          </svg>
+          <div class="ring-center">
+            <span class="ring-pct" id="ringPct">0%</span>
+            <span class="ring-cap">to goal</span>
+          </div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="hstat">
+            <span class="hstat-label">Current weight</span>
+            <span class="hstat-value"><span id="currentWeight">104</span><small>kg</small></span>
+            <span class="hstat-foot" id="weightDelta">—</span>
+          </div>
+          <div class="hstat">
+            <span class="hstat-label">Lost so far</span>
+            <span class="hstat-value"><span id="lostKg">0</span><small>kg</small></span>
+            <span class="hstat-foot" id="lostFoot">of 31 kg target</span>
+          </div>
+          <div class="hstat">
+            <span class="hstat-label">Remaining</span>
+            <span class="hstat-value"><span id="remainKg">31</span><small>kg</small></span>
+            <span class="hstat-foot">until 73 kg</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Stat tiles -->
+      <section class="tiles">
+        <div class="tile">
+          <div class="tile-ico ico-blue">⏳</div>
+          <div>
+            <span class="tile-value" id="daysLeft">—</span>
+            <span class="tile-label">days left</span>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-ico ico-orange">🔥</div>
+          <div>
+            <span class="tile-value" id="streak">0</span>
+            <span class="tile-label">day streak</span>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-ico ico-green">★</div>
+          <div>
+            <span class="tile-value" id="bestStreak">0</span>
+            <span class="tile-label">best streak</span>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-ico ico-purple">✓</div>
+          <div>
+            <span class="tile-value" id="completion">0%</span>
+            <span class="tile-label">avg completion</span>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-ico ico-teal">📅</div>
+          <div>
+            <span class="tile-value" id="daysLogged">0</span>
+            <span class="tile-label">days logged</span>
+          </div>
+        </div>
+        <div class="tile">
+          <div class="tile-ico ico-pink">📈</div>
+          <div>
+            <span class="tile-value" id="paceLabel">—</span>
+            <span class="tile-label">vs target pace</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Chart + today summary -->
+      <section class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Weight trend</h2>
+            <span class="legend"><i class="dot dot-line"></i> actual <i class="dot dot-dash"></i> target</span>
+          </div>
+          <div class="chart-wrap">
+            <svg id="chart" viewBox="0 0 720 280" preserveAspectRatio="none"></svg>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h2>Today's habits</h2></div>
+          <ul class="habits" id="habitList"></ul>
+          <div class="panel-foot">
+            <div class="mini-bar"><span id="todayBar"></span></div>
+            <span class="muted" id="todayScore">No data for today yet</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent history -->
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Recent days</h2>
+          <button class="btn btn-ghost" id="exportBtn" style="padding:8px 14px;font-size:13px">⤓ Export CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Date</th><th>Day</th><th>Weight</th><th>Protein</th><th>Steps</th>
+                <th>Gym</th><th>Breakfast</th><th>Lunch</th><th>Dinner</th><th>Steps2</th><th>Sleep</th><th>Score</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="foot muted">Data is saved locally in your browser. Export anytime above.</footer>
+    </main>
+  </div>
+
+  <!-- Log modal -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Daily entry</h2>
+        <button class="icon-btn" id="closeModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="field">
+          <label>Date</label>
+          <div class="date-input" id="dateInput" tabindex="0">
+            <span id="fDateText">Select date</span>
+            <span class="cal-ico">📅</span>
+          </div>
+          <span class="day-pill" id="fDay">—</span>
+
+          <div class="calendar" id="calendar">
+            <div class="cal-head">
+              <button type="button" class="cal-nav" id="calPrev">‹</button>
+              <span class="cal-title" id="calTitle"></span>
+              <button type="button" class="cal-nav" id="calNext">›</button>
+            </div>
+            <div class="cal-dow"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+            <div class="cal-grid" id="calGrid"></div>
+            <div class="cal-foot"><button type="button" class="cal-today" id="calToday">Today</button></div>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Weight (kg)</label>
+            <input type="number" id="fWeight" min="0" max="200" step="0.1" placeholder="0 – 200" />
+          </div>
+          <div class="field">
+            <label>Steps – morning</label>
+            <input type="number" id="fSteps" min="0" max="15000" step="1" placeholder="0 – 15000" />
+          </div>
+          <div class="field">
+            <label>Steps2 – evening</label>
+            <input type="number" id="fSteps2" min="0" max="15000" step="1" placeholder="0 – 15000" />
+          </div>
+        </div>
+
+        <div class="toggles" id="toggleWrap"></div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button class="btn btn-primary" id="submitBtn">Save entry</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

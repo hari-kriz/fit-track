@@ -1,0 +1,9 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Dependencies / build (none currently, but future-proofing)
+node_modules/
+dist/
+*.log
