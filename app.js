@@ -55,10 +55,9 @@ function setSync(state, label) {
   el.textContent = '● ' + label;
 }
 
-// Convert a stored entry to a Supabase row.
+// Convert a stored entry to a Supabase row (shared dataset, keyed by date).
 function entryToRow(ds, e) {
   const row = { date: ds, weight: e.weight ?? null, steps: e.steps ?? null, steps2: e.steps2 ?? null };
-  if (currentUser) row.user_id = currentUser.id;
   HABIT_KEYS.forEach(k => { row[k] = !!e[k]; });
   return row;
 }
@@ -91,7 +90,7 @@ async function pushEntry(ds, entry, quiet) {
   if (!sb || !currentUser) return false;
   if (!quiet) setSync('syncing', 'saving…');
   try {
-    const { error } = await sb.from('entries').upsert(entryToRow(ds, entry), { onConflict: 'user_id,date' });
+    const { error } = await sb.from('entries').upsert(entryToRow(ds, entry), { onConflict: 'date' });
     if (error) throw error;
     if (!quiet) setSync('ok', 'synced');
     return true;
@@ -113,6 +112,7 @@ async function migrateLocalToCloud() {
 }
 
 /* ---- Authentication ---- */
+const OWNER_EMAIL = 'harikrizdata@gmail.com';   // only this account can add/edit
 function authMsg(text, kind) {
   const el = $('#authMsg');
   el.textContent = text || '';
@@ -135,8 +135,10 @@ async function handleSession(session) {
   if (currentUser) {
     document.body.classList.add('signed-in');
     $('#authSub').textContent = 'Sign in to continue';
-    await migrateLocalToCloud();   // one-time recovery of any old local data
-    await pullAll();               // load everything from Supabase
+    const isOwner = (currentUser.email || '').toLowerCase() === OWNER_EMAIL;
+    $('#openLog').style.display = isOwner ? '' : 'none';   // viewers can't log
+    if (isOwner) await migrateLocalToCloud();              // recover old local data (owner only)
+    await pullAll();                                       // load shared data from Supabase
   } else {
     DATA = {};
     document.body.classList.remove('signed-in');
