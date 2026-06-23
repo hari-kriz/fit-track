@@ -39,6 +39,68 @@ const saveData = (d) => localStorage.setItem(STORE_KEY, JSON.stringify(d));
 
 let DATA = loadData();
 
+/* ============================================================
+   Supabase backend (with localStorage fallback)
+   ============================================================ */
+const HABIT_KEYS = HABITS.map(h => h.key);
+let sb = null;
+try {
+  if (window.supabase && typeof SUPABASE_URL === 'string') {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+} catch (e) { console.warn('Supabase init failed:', e); }
+
+function setSync(state, label) {
+  const el = $('#syncStatus');
+  if (!el) return;
+  el.className = 'sync sync-' + state;
+  el.textContent = '● ' + label;
+}
+
+// Convert a stored entry to a Supabase row.
+function entryToRow(ds, e) {
+  const row = { date: ds, weight: e.weight ?? null, steps: e.steps ?? null, steps2: e.steps2 ?? null };
+  HABIT_KEYS.forEach(k => { row[k] = !!e[k]; });
+  return row;
+}
+// Convert a Supabase row to a stored entry.
+function rowToEntry(r) {
+  const e = { weight: r.weight, steps: r.steps, steps2: r.steps2 };
+  HABIT_KEYS.forEach(k => { e[k] = !!r[k]; });
+  return e;
+}
+
+// Pull all rows from Supabase and merge into DATA.
+async function pullAll() {
+  if (!sb) { setSync('off', 'local only'); return; }
+  setSync('syncing', 'syncing…');
+  try {
+    const { data, error } = await sb.from('entries').select('*');
+    if (error) throw error;
+    (data || []).forEach(r => { DATA[r.date] = rowToEntry(r); });
+    saveData(DATA);
+    setSync('ok', 'synced');
+    render();
+  } catch (e) {
+    console.warn('Supabase pull failed:', e.message || e);
+    setSync('off', 'offline');
+  }
+}
+
+// Push a single entry to Supabase.
+async function pushEntry(ds, entry) {
+  if (!sb) return;
+  setSync('syncing', 'saving…');
+  try {
+    const { error } = await sb.from('entries').upsert(entryToRow(ds, entry), { onConflict: 'date' });
+    if (error) throw error;
+    setSync('ok', 'synced');
+  } catch (e) {
+    console.warn('Supabase save failed:', e.message || e);
+    setSync('off', 'saved locally');
+  }
+}
+
 // Combined daily steps (morning + evening) and whether the goal is met.
 const totalSteps = (e) => (Number(e?.steps) || 0) + (Number(e?.steps2) || 0);
 const stepsDone = (e) => totalSteps(e) >= CONFIG.stepsGoal;
@@ -403,6 +465,7 @@ function submitEntry() {
   saveData(DATA);
   closeModal();
   render();
+  pushEntry(ds, entry);
 }
 
 /* ============================================================
@@ -448,4 +511,5 @@ document.addEventListener('click', (e) => {
 
 $('#overlay').addEventListener('click', (e) => { if (e.target === $('#overlay')) closeModal(); });
 
-render();
+render();      // instant render from localStorage
+pullAll();     // then sync from Supabase

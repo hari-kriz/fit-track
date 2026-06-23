@@ -45,6 +45,10 @@ body {
 .topbar-meta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
 .topbar-meta b { color: var(--text); font-weight: 700; }
 .dot-sep { opacity: .5; }
+.sync { font-weight: 700; font-size: 12px; }
+.sync-ok { color: var(--good); }
+.sync-syncing { color: #eab308; }
+.sync-idle, .sync-off { color: var(--muted); }
 .page-title { margin-bottom: 24px; }
 .page-title h1 { font-size: 26px; font-weight: 800; }
 .muted { color: var(--muted); font-size: 13px; }

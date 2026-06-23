@@ -27,6 +27,8 @@
             <span>Started <b id="startDateLabel">—</b></span>
             <span class="dot-sep">•</span>
             <span>Goal <b id="goalDate">—</b></span>
+            <span class="dot-sep">•</span>
+            <span id="syncStatus" class="sync sync-idle">● local only</span>
           </div>
         </div>
         <button class="btn btn-primary" id="openLog">＋ Log today's data</button>
@@ -214,6 +216,8 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
