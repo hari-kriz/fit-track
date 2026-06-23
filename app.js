@@ -34,10 +34,7 @@ const fmtDate = (d) => `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const todayMidnight = () => { const t = new Date(); t.setHours(0,0,0,0); return t; };
 
-const loadData = () => { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; } };
-const saveData = (d) => localStorage.setItem(STORE_KEY, JSON.stringify(d));
-
-let DATA = loadData();
+let DATA = {};   // in-memory only; Supabase is the single source of truth
 
 /* ============================================================
    Supabase backend (with localStorage fallback)
@@ -72,39 +69,47 @@ function rowToEntry(r) {
   return e;
 }
 
-// Pull all rows for the logged-in user and merge into DATA.
+// Load all rows for the logged-in user from Supabase (the only source of truth).
 async function pullAll() {
-  if (!sb || !currentUser) { setSync('off', 'local only'); return; }
+  if (!sb || !currentUser) return;
   setSync('syncing', 'syncing…');
   try {
     const { data, error } = await sb.from('entries').select('*');
     if (error) throw error;
-    const cloudDates = new Set();
-    (data || []).forEach(r => { DATA[r.date] = rowToEntry(r); cloudDates.add(r.date); });
-    saveData(DATA);
+    DATA = {};
+    (data || []).forEach(r => { DATA[r.date] = rowToEntry(r); });
     render();
-    // Push any local-only entries up to the cloud (e.g. data logged before signing in).
-    const localOnly = Object.keys(DATA).filter(ds => !cloudDates.has(ds));
-    for (const ds of localOnly) await pushEntry(ds, DATA[ds], true);
     setSync('ok', 'synced');
   } catch (e) {
-    console.warn('Supabase pull failed:', e.message || e);
+    console.warn('Supabase load failed:', e.message || e);
     setSync('off', 'offline');
   }
 }
 
-// Push a single entry to Supabase.
+// Push a single entry to Supabase. Returns true on success.
 async function pushEntry(ds, entry, quiet) {
-  if (!sb || !currentUser) return;
+  if (!sb || !currentUser) return false;
   if (!quiet) setSync('syncing', 'saving…');
   try {
     const { error } = await sb.from('entries').upsert(entryToRow(ds, entry), { onConflict: 'user_id,date' });
     if (error) throw error;
     if (!quiet) setSync('ok', 'synced');
+    return true;
   } catch (e) {
     console.warn('Supabase save failed:', e.message || e);
-    if (!quiet) setSync('off', 'saved locally');
+    if (!quiet) setSync('off', 'save failed');
+    return false;
   }
+}
+
+// One-time recovery: older versions cached entries in localStorage. On login,
+// push any leftovers to Supabase once, then delete the local copy for good.
+async function migrateLocalToCloud() {
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(STORE_KEY)); } catch { local = null; }
+  if (!local || typeof local !== 'object') return;
+  for (const ds of Object.keys(local)) await pushEntry(ds, local[ds], true);
+  localStorage.removeItem(STORE_KEY);
 }
 
 /* ---- Authentication ---- */
@@ -115,10 +120,9 @@ function authMsg(text, kind) {
 }
 
 async function initAuth() {
-  if (!sb) {                       // no backend configured -> local-only mode
-    document.body.classList.add('signed-in');
-    setSync('off', 'local only');
-    render();
+  if (!sb) {                       // backend required for cloud-only mode
+    authMsg('Backend not configured — cannot reach the server.', 'error');
+    setSync('off', 'offline');
     return;
   }
   const { data } = await sb.auth.getSession();
@@ -131,9 +135,10 @@ async function handleSession(session) {
   if (currentUser) {
     document.body.classList.add('signed-in');
     $('#authSub').textContent = 'Sign in to continue';
-    render();
-    await pullAll();
+    await migrateLocalToCloud();   // one-time recovery of any old local data
+    await pullAll();               // load everything from Supabase
   } else {
+    DATA = {};
     document.body.classList.remove('signed-in');
   }
 }
@@ -513,7 +518,7 @@ function loadIntoForm(ds) {
   });
 }
 
-function submitEntry() {
+async function submitEntry() {
   const ds = selectedISO;
   if (!ds) { alert('Please choose a date.'); return; }
 
@@ -539,11 +544,12 @@ function submitEntry() {
   };
   document.querySelectorAll('.toggle').forEach(t => { entry[t.dataset.key] = t.classList.contains('on'); });
 
+  // Save to Supabase first; only update the UI if it succeeds.
+  const ok = await pushEntry(ds, entry);
+  if (!ok) { alert('Could not save to the server. Check your connection and try again.'); return; }
   DATA[ds] = entry;
-  saveData(DATA);
-  closeModal();
   render();
-  pushEntry(ds, entry);
+  closeModal();
 }
 
 /* ============================================================
