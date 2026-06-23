@@ -147,17 +147,6 @@ async function signIn() {
   if (error) authMsg(error.message, 'error');
 }
 
-async function signUp() {
-  const email = $('#authEmail').value.trim();
-  const password = $('#authPass').value;
-  if (!email || !password) { authMsg('Enter an email and password to sign up.', 'error'); return; }
-  if (password.length < 6) { authMsg('Password must be at least 6 characters.', 'error'); return; }
-  authMsg('Creating account…');
-  const { data, error } = await sb.auth.signUp({ email, password });
-  if (error) { authMsg(error.message, 'error'); return; }
-  if (!data.session) authMsg('Account created. Check your email to confirm, then sign in.', 'ok');
-}
-
 async function signOut() {
   if (sb) await sb.auth.signOut();
   currentUser = null;
@@ -409,6 +398,27 @@ function renderHistory() {
 /* ============================================================
    Modal / entry form
    ============================================================ */
+const LOG_PASSWORD = 'Hadhiz654*';   // gate for opening the daily-entry form
+
+function openPwGate() {
+  $('#pwInput').value = '';
+  $('#pwMsg').textContent = '';
+  $('#pwOverlay').classList.add('show');
+  setTimeout(() => $('#pwInput').focus(), 50);
+}
+function closePwGate() { $('#pwOverlay').classList.remove('show'); }
+function checkPw() {
+  if ($('#pwInput').value === LOG_PASSWORD) {
+    closePwGate();
+    openModal();
+  } else {
+    const m = $('#pwMsg');
+    m.textContent = 'Incorrect password.';
+    m.className = 'auth-msg error';
+    $('#pwInput').select();
+  }
+}
+
 let selectedISO = null;   // currently selected date 'YYYY-MM-DD'
 let calView = null;       // first-of-month currently shown in calendar
 
@@ -560,11 +570,18 @@ function exportCSV() {
    Wire up
    ============================================================ */
 buildToggles();
-$('#openLog').addEventListener('click', () => openModal());
+$('#openLog').addEventListener('click', openPwGate);
 $('#closeModal').addEventListener('click', closeModal);
 $('#cancelBtn').addEventListener('click', closeModal);
 $('#submitBtn').addEventListener('click', submitEntry);
 $('#exportBtn').addEventListener('click', exportCSV);
+
+// Password gate for logging
+$('#pwUnlock').addEventListener('click', checkPw);
+$('#pwClose').addEventListener('click', closePwGate);
+$('#pwCancel').addEventListener('click', closePwGate);
+$('#pwInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkPw(); });
+$('#pwOverlay').addEventListener('click', (e) => { if (e.target === $('#pwOverlay')) closePwGate(); });
 
 // Calendar popup
 $('#dateInput').addEventListener('click', toggleCalendar);
@@ -581,7 +598,6 @@ $('#overlay').addEventListener('click', (e) => { if (e.target === $('#overlay'))
 
 // Auth controls
 $('#authSignIn').addEventListener('click', signIn);
-$('#authSignUp').addEventListener('click', signUp);
 $('#logoutBtn').addEventListener('click', signOut);
 $('#authPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') signIn(); });
 

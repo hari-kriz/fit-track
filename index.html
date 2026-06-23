@@ -219,6 +219,27 @@
     </div>
   </div>
 
+  <!-- Password gate for logging -->
+  <div class="overlay" id="pwOverlay">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-head">
+        <h2>Enter password</h2>
+        <button class="icon-btn" id="pwClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="pwInput" placeholder="••••••••" autocomplete="off" />
+        </div>
+        <div class="auth-msg" id="pwMsg"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="pwCancel">Cancel</button>
+        <button class="btn btn-primary" id="pwUnlock">Unlock</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Auth gate -->
   <div class="auth-gate" id="authGate">
     <div class="auth-card">
@@ -239,7 +260,6 @@
       </div>
       <div class="auth-msg" id="authMsg"></div>
       <button class="btn btn-primary" id="authSignIn">Sign in</button>
-      <button class="btn btn-ghost" id="authSignUp">Create account</button>
     </div>
   </div>
 
